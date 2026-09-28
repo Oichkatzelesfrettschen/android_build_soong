@@ -13,6 +13,8 @@ func TestGlobalThinLtoOptIn(t *testing.T) {
 		cc_library_shared { name: "libnever", srcs: ["never.c"], lto: { never: true } }
 		cc_library_shared { name: "libfull", srcs: ["full.c"], lto: { full: true } }
 		cc_library_static { name: "libstatic", srcs: ["static.c"] }
+		cc_binary { name: "static_binary", srcs: ["static_binary.c"], static_executable: true }
+		cc_binary { name: "dynamic_binary", srcs: ["dynamic_binary.c"] }
 		cc_test { name: "global_test", srcs: ["test.c"], gtest: false }
 	`
 	for _, enabled := range []bool{false, true} {
@@ -31,6 +33,8 @@ func TestGlobalThinLtoOptIn(t *testing.T) {
 			{"libnever", "android_arm_armv7-a-neon_shared", false},
 			{"libfull", "android_arm_armv7-a-neon_shared", false},
 			{"libstatic", "android_arm_armv7-a-neon_static", false},
+			{"static_binary", "android_arm64_armv8-a", false},
+			{"dynamic_binary", "android_arm64_armv8-a", enabled},
 			{"global_test", "android_arm_armv7-a-neon", false},
 		} {
 			compiled := context.ModuleForTests(module.name, module.variant).Module().(*Module)
