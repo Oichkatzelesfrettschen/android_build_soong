@@ -66,7 +66,7 @@ func (lto *lto) begin(ctx BaseModuleContext) {
 	if ctx.Config().IsEnvTrue("DISABLE_LTO") {
 		lto.Properties.Lto.Never = boolPtr(true)
 	} else if ctx.Config().IsEnvTrue("GLOBAL_THINLTO") {
-		if globalThinLtoBionicExcluded(ctx.ModuleDir(), ctx.ModuleName()) {
+		if globalThinLtoExcluded(ctx.ModuleDir(), ctx.ModuleName()) {
 			lto.Properties.Lto.Never = boolPtr(true)
 			return
 		}
@@ -78,9 +78,9 @@ func (lto *lto) begin(ctx BaseModuleContext) {
 	}
 }
 
-// Bionic's libc and linker need their upstream module-level ThinLTO opt-outs.
-// Apply them only to the opt-in build so the disabled build graph stays intact.
-func globalThinLtoBionicExcluded(moduleDir, moduleName string) bool {
+// The bionic runtime and framework JNI modules need their upstream ThinLTO
+// opt-outs with the Android 11 Clang toolchain. The disabled graph stays intact.
+func globalThinLtoExcluded(moduleDir, moduleName string) bool {
 	switch moduleDir {
 	case "bionic/libc":
 		return moduleName == "libc"
@@ -90,6 +90,12 @@ func globalThinLtoBionicExcluded(moduleDir, moduleName string) bool {
 		return moduleName == "libm"
 	case "bionic/linker":
 		return moduleName == "ld-android" || moduleName == "linker"
+	case "frameworks/base/core/jni":
+		return moduleName == "libandroid_runtime"
+	case "frameworks/base/media/jni":
+		return moduleName == "libmedia_jni"
+	case "frameworks/base/media/jni/audioeffect":
+		return moduleName == "libaudioeffect_jni"
 	}
 	return false
 }

@@ -43,7 +43,7 @@ func TestGlobalThinLtoOptIn(t *testing.T) {
 	}
 }
 
-func TestGlobalThinLtoBionicExclusions(t *testing.T) {
+func TestGlobalThinLtoUpstreamExclusions(t *testing.T) {
 	for _, module := range []struct {
 		directory string
 		name      string
@@ -55,11 +55,15 @@ func TestGlobalThinLtoBionicExclusions(t *testing.T) {
 		{"bionic/libm", "libm", true},
 		{"bionic/linker", "ld-android", true},
 		{"bionic/linker", "linker", true},
+		{"frameworks/base/core/jni", "libandroid_runtime", true},
+		{"frameworks/base/media/jni", "libmedia_jni", true},
+		{"frameworks/base/media/jni/audioeffect", "libaudioeffect_jni", true},
 		{"bionic/libc", "libc_common_shared", false},
+		{"frameworks/base/media/jni", "libmedia_jni_utils", false},
 		{"other/libc", "libc", false},
 		{"other/linker", "linker", false},
 	} {
-		if actual := globalThinLtoBionicExcluded(module.directory, module.name); actual != module.excluded {
+		if actual := globalThinLtoExcluded(module.directory, module.name); actual != module.excluded {
 			t.Errorf("%s:%s excluded=%t, want %t", module.directory, module.name, actual, module.excluded)
 		}
 	}
