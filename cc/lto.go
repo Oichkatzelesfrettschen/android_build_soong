@@ -71,7 +71,7 @@ func (lto *lto) begin(ctx BaseModuleContext) {
 			return
 		}
 		staticLibrary := ctx.static() && !ctx.staticBinary()
-		if !staticLibrary && !ctx.Host() && !ctx.isVndk() && !ctx.isCfi() && !ctx.isTest() &&
+		if !staticLibrary && !ctx.staticBinary() && !ctx.Host() && !ctx.isVndk() && !ctx.isCfi() && !ctx.isTest() &&
 			!lto.Disabled() && !Bool(lto.Properties.Lto.Full) {
 			lto.Properties.Lto.Thin = boolPtr(true)
 		}
