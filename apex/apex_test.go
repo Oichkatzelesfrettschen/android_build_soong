@@ -4070,6 +4070,12 @@ func TestOverrideApex(t *testing.T) {
 	ensureNotContains(t, androidMk, "LOCAL_MODULE := override_app.myapex")
 	ensureNotContains(t, androidMk, "LOCAL_MODULE := apex_manifest.pb.myapex")
 	ensureNotContains(t, androidMk, "LOCAL_MODULE_STEM := myapex.apex")
+
+	flattenedBundle := ctx.ModuleForTests("myapex", "android_common_override_myapex_myapex_flattened").Module().(*apexBundle)
+	flattenedData := android.AndroidMkDataForTest(t, config, "", flattenedBundle)
+	var flattenedBuilder strings.Builder
+	flattenedData.Custom(&flattenedBuilder, flattenedBundle.Name(), "TARGET_", "", flattenedData)
+	ensureContains(t, flattenedBuilder.String(), "PACKAGES.override_myapex.OVERRIDES := unknownapex myapex")
 }
 
 func TestLegacyAndroid10Support(t *testing.T) {
