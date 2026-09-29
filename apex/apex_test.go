@@ -4075,7 +4075,7 @@ func TestOverrideApex(t *testing.T) {
 	flattenedData := android.AndroidMkDataForTest(t, config, "", flattenedBundle)
 	var flattenedBuilder strings.Builder
 	flattenedData.Custom(&flattenedBuilder, flattenedBundle.Name(), "TARGET_", "", flattenedData)
-	ensureContains(t, flattenedBuilder.String(), "PACKAGES.override_myapex.OVERRIDES := unknownapex myapex")
+	ensureContains(t, flattenedBuilder.String(), "PACKAGES.override_myapex.flattened.OVERRIDES := unknownapex myapex")
 }
 
 func TestLegacyAndroid10Support(t *testing.T) {
