@@ -77,8 +77,10 @@ func (lto *lto) begin(ctx BaseModuleContext) {
 	} else if ctx.Host() {
 		// Performance and binary size are less important for host binaries.
 		ltoDefault = false
-	} else if ctx.Arch().ArchType.Multilib == "lib32" {
-		// LP32 has many subtle issues and less test coverage.
+	} else if ctx.Arch().ArchType.Multilib == "lib32" && !ctx.Config().IsEnvTrue("LIB32_THINLTO") {
+		// LP32 has many subtle issues and less test coverage. LIB32_THINLTO=true
+		// applies the 64-bit default to lib32 modules, which on a 32-bit-only
+		// device is every device module.
 		ltoDefault = false
 	}
 
