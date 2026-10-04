@@ -22,9 +22,10 @@ import (
 )
 
 func genProto(ctx android.ModuleContext, protoFiles android.Paths, flags android.ProtoFlags) android.Paths {
-	// Shard proto files into groups of 100 to avoid having to recompile all of them if one changes and to avoid
-	// hitting command line length limits.
-	shards := android.ShardPaths(protoFiles, 100)
+	// Shard proto files into groups of 50 to avoid having to recompile all of them if one changes and to keep
+	// each shard's command, which ninja runs as a single bash -c argument and which names the absolute output
+	// directory several times per file, under the kernel's MAX_ARG_STRLEN of 131072 bytes.
+	shards := android.ShardPaths(protoFiles, 50)
 
 	srcJarFiles := make(android.Paths, 0, len(shards))
 

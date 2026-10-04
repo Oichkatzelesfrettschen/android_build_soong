@@ -678,7 +678,12 @@ type genSrcsProperties struct {
 	Shard_size *int64
 }
 
-const defaultShardSize = 100
+// sbox runs a shard's command as one bash -c argument after replacing each
+// __SBOX_OUT_DIR__ with its absolute sandbox path, and Linux caps a single
+// exec argument at MAX_ARG_STRLEN (131072 bytes). A gensrcs command names
+// the sandbox and the out directory several times per input, so the
+// argument grows with the shard size times the out directory's path length.
+const defaultShardSize = 50
 
 func NewGenRule() *Module {
 	properties := &genRuleProperties{}
