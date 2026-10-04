@@ -17,6 +17,8 @@ package config
 import (
 	"sort"
 	"strings"
+
+	"android/soong/android"
 )
 
 // Cflags that should be filtered out when compiling with clang
@@ -95,8 +97,8 @@ var ClangUnknownLldflags = sorted([]string{
 
 var ClangLibToolingUnknownCflags = sorted([]string{})
 
-func init() {
-	pctx.StaticVariable("ClangExtraCflags", strings.Join([]string{
+func clangExtraCflags(config android.Config) []string {
+	flags := []string{
 		"-D__compiler_offsetof=__builtin_offsetof",
 
 		// Emit address-significance table which allows linker to perform safe ICF. Clang does
@@ -135,7 +137,14 @@ func init() {
 		// Warnings from clang-10
 		// Nested and array designated initialization is nice to have.
 		"-Wno-c99-designator",
-	}, " "))
+	}
+	return ClangFilterPassManagerCflags(config, flags)
+}
+
+func init() {
+	pctx.VariableFunc("ClangExtraCflags", func(ctx android.PackageVarContext) string {
+		return strings.Join(clangExtraCflags(ctx.Config()), " ")
+	})
 
 	pctx.StaticVariable("ClangExtraCppflags", strings.Join([]string{
 		// -Wimplicit-fallthrough is not enabled by -Wall.
@@ -152,7 +161,35 @@ func init() {
 		"-nostdlibinc",
 	}, " "))
 
-	pctx.StaticVariable("ClangExtraNoOverrideCflags", strings.Join([]string{
+	pctx.VariableFunc("ClangExtraNoOverrideCflags", func(ctx android.PackageVarContext) string {
+		return strings.Join(clangExtraNoOverrideCflags(ctx.Config()), " ")
+	})
+
+	// Extra cflags for external third-party projects to disable warnings that
+	// are infeasible to fix in all the external projects and their upstream repos.
+	pctx.StaticVariable("ClangExtraExternalCflags", strings.Join([]string{
+		"-Wno-enum-compare",
+		"-Wno-enum-compare-switch",
+
+		// http://b/72331524 Allow null pointer arithmetic until the instances detected by
+		// this new warning are fixed.
+		"-Wno-null-pointer-arithmetic",
+
+		// Bug: http://b/29823425 Disable -Wnull-dereference until the
+		// new instances detected by this warning are fixed.
+		"-Wno-null-dereference",
+
+		// http://b/145211477
+		"-Wno-pointer-compare",
+		// http://b/145211022
+		"-Wno-xor-used-as-pow",
+		// http://b/145211022
+		"-Wno-final-dtor-non-final-class",
+	}, " "))
+}
+
+func clangExtraNoOverrideCflags(config android.Config) []string {
+	flags := []string{
 		"-Werror=address-of-temporary",
 		// Bug: http://b/29823425 Disable -Wnull-dereference until the
 		// new cases detected by this warning in Clang r271374 are
@@ -183,29 +220,78 @@ func init() {
 		"-Wno-enum-enum-conversion",                 // http://b/154138986
 		"-Wno-enum-float-conversion",                // http://b/154255917
 		"-Wno-pessimizing-move",                     // http://b/154270751
-	}, " "))
+	}
+	if ClangMajorVersion(config) >= 22 {
+		flags = append(flags, clang22NoOverrideCflags...)
+	}
+	return flags
+}
 
-	// Extra cflags for external third-party projects to disable warnings that
-	// are infeasible to fix in all the external projects and their upstream repos.
-	pctx.StaticVariable("ClangExtraExternalCflags", strings.Join([]string{
-		"-Wno-enum-compare",
-		"-Wno-enum-compare-switch",
+// clang22NoOverrideCflags silence diagnostics that Clang 22 reports, by
+// default or under -Wall and -Wextra, on sources the tree compiles cleanly
+// with Clang 11. compilerFlags adds -Wall -Werror to modules outside
+// WarningAllowedProjects, so each diagnostic fails the compile. The
+// no-override position after module cflags keeps a module's -Werror=<name>
+// from enabling them again.
+var clang22NoOverrideCflags = []string{
+	"-Wno-unnecessary-virtual-specifier",
+	"-Wno-deprecated-non-prototype",
+	"-Wno-nontrivial-memcall",
+	"-Wno-deprecated-builtins",
+	"-Wno-unterminated-string-initialization",
+	"-Wno-deprecated-literal-operator",
+	"-Wno-missing-designated-field-initializers",
+	"-Wno-psabi",
+	"-Wno-bitwise-instead-of-logical",
+	"-Wno-unused-but-set-variable",
+	"-Wno-vla-cxx-extension",
+	"-Wno-array-parameter",
+	"-Wno-single-bit-bitfield-constant-conversion",
+	"-Wno-packed-non-pod",
+	"-Wno-deprecated-redundant-constexpr-static-def",
+	"-Wno-null-pointer-subtraction",
+	"-Wno-cast-function-type-mismatch",
+	"-Wno-unqualified-std-cast-call",
+	"-Wno-invalid-offsetof",
+	"-Wno-thread-safety-reference-return",
+	"-Wno-unused-but-set-parameter",
+	"-Wno-character-conversion",
+	"-Wno-missing-template-arg-list-after-template-kw",
+	"-Wno-deprecated-this-capture",
+	"-Wno-non-c-typedef-for-linkage",
+}
 
-		// http://b/72331524 Allow null pointer arithmetic until the instances detected by
-		// this new warning are fixed.
-		"-Wno-null-pointer-arithmetic",
+// ClangHasLegacyPassManager reports whether the compiler still carries the
+// legacy pass manager. Clang 15 removes it, so the new pass manager is the
+// only pipeline.
+func ClangHasLegacyPassManager(config android.Config) bool {
+	return ClangMajorVersion(config) < 15
+}
 
-		// Bug: http://b/29823425 Disable -Wnull-dereference until the
-		// new instances detected by this warning are fixed.
-		"-Wno-null-dereference",
-
-		// http://b/145211477
-		"-Wno-pointer-compare",
-		// http://b/145211022
-		"-Wno-xor-used-as-pow",
-		// http://b/145211022
-		"-Wno-final-dtor-non-final-class",
-	}, " "))
+// ClangFilterPassManagerCflags rewrites the pass manager selectors for the
+// Clang release from ClangMajorVersion. Through Clang 13 the driver takes
+// -fexperimental-new-pass-manager and -fno-experimental-new-pass-manager.
+// Clang 14 removes both spellings, defaults to the new pass manager and
+// selects the legacy one with -flegacy-pass-manager. From Clang 15 no legacy
+// pass manager exists and both selectors are dropped.
+func ClangFilterPassManagerCflags(config android.Config, cflags []string) []string {
+	major := ClangMajorVersion(config)
+	if major < 14 {
+		return cflags
+	}
+	ret := make([]string, 0, len(cflags))
+	for _, f := range cflags {
+		switch f {
+		case "-fexperimental-new-pass-manager":
+		case "-fno-experimental-new-pass-manager":
+			if major == 14 {
+				ret = append(ret, "-flegacy-pass-manager")
+			}
+		default:
+			ret = append(ret, f)
+		}
+	}
+	return ret
 }
 
 func ClangFilterUnknownCflags(cflags []string) []string {

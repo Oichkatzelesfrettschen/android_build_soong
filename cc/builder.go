@@ -620,7 +620,9 @@ func TransformObjToStaticLib(ctx android.ModuleContext, objFiles android.Paths,
 	arCmd := "${config.ClangBin}/llvm-ar"
 	arFlags := "crsPD"
 	if !ctx.Darwin() {
-		arFlags += " -format=gnu"
+		// llvm-ar from Clang 22 parses only the double-dash --format spelling;
+		// Clang 11's llvm-ar accepts both spellings and writes the same archive.
+		arFlags += " --format=gnu"
 	}
 
 	ctx.Build(pctx, android.BuildParams{

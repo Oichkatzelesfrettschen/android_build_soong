@@ -418,6 +418,9 @@ func (compiler *baseCompiler) compilerFlags(ctx ModuleContext, flags Flags, deps
 	flags.Global.AsFlags = append(flags.Global.AsFlags, "-D__ASSEMBLY__")
 
 	flags.Global.CppFlags = append(flags.Global.CppFlags, tc.ClangCppflags())
+	if ctx.Os() == android.Linux {
+		flags.Global.CppFlags = append(flags.Global.CppFlags, config.LinuxGlibcClangCppflags(ctx.Config())...)
+	}
 
 	flags.Global.YasmFlags = append(flags.Global.YasmFlags, tc.YasmFlags())
 
