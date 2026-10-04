@@ -261,12 +261,25 @@ var (
 		},
 		"asFlags")
 
-	_ = pctx.SourcePathVariable("sAbiDumper", "prebuilts/clang-tools/${config.HostPrebuiltTag}/bin/header-abi-dumper")
+	// SABI_DUMPER_PREBUILTS names a clang-tools checkout whose
+	// header-abi-dumper, header-abi-linker and clang resource headers replace
+	// prebuilts/clang-tools' for every sabi dump and link, so a compiler whose
+	// libc++ the stock dumper's libclang cannot parse still gets ABI dumps.
+	// header-abi-diff stays prebuilts/clang-tools', the differ whose verdicts
+	// the prebuilts/abi-dumps references were made against.
+	_ = pctx.VariableFunc("sAbiDumperTools", func(ctx android.PackageVarContext) string {
+		dir := ctx.Config().Getenv("SABI_DUMPER_PREBUILTS")
+		if dir == "" {
+			dir = "prebuilts/clang-tools"
+		}
+		return dir + "/" + ctx.Config().PrebuiltOS()
+	})
+	_ = pctx.StaticVariable("sAbiDumper", "${sAbiDumperTools}/bin/header-abi-dumper")
 
 	// -w has been added since header-abi-dumper does not need to produce any sort of diagnostic information.
 	sAbiDump, sAbiDumpRE = pctx.RemoteStaticRules("sAbiDump",
 		blueprint.RuleParams{
-			Command:     "rm -f $out && $reTemplate$sAbiDumper --root-dir . --root-dir $$OUT_DIR:out -o ${out} $in $exportDirs -- $cFlags -w -isystem prebuilts/clang-tools/${config.HostPrebuiltTag}/clang-headers",
+			Command:     "rm -f $out && $reTemplate$sAbiDumper --root-dir . --root-dir $$OUT_DIR:out -o ${out} $in $exportDirs -- $cFlags -w -isystem ${sAbiDumperTools}/clang-headers",
 			CommandDeps: []string{"$sAbiDumper"},
 		}, &remoteexec.REParams{
 			Labels:       map[string]string{"type": "abi-dump", "tool": "header-abi-dumper"},
@@ -277,8 +290,8 @@ var (
 			},
 		}, []string{"cFlags", "exportDirs"}, nil)
 
-	_ = pctx.SourcePathVariable("sAbiLinker", "prebuilts/clang-tools/${config.HostPrebuiltTag}/bin/header-abi-linker")
-	_ = pctx.SourcePathVariable("sAbiLinkerLibs", "prebuilts/clang-tools/${config.HostPrebuiltTag}/lib64")
+	_ = pctx.StaticVariable("sAbiLinker", "${sAbiDumperTools}/bin/header-abi-linker")
+	_ = pctx.StaticVariable("sAbiLinkerLibs", "${sAbiDumperTools}/lib64")
 
 	// Rule to combine .dump sAbi dump files from multiple source files into a single .ldump
 	// sAbi dump file.
