@@ -50,6 +50,10 @@ type LTOProperties struct {
 	FullDep bool `blueprint:"mutated"`
 	ThinDep bool `blueprint:"mutated"`
 
+	// GlobalThin records that GLOBAL_THINLTO, not the module's own lto
+	// properties, selected ThinLTO.
+	GlobalThin bool `blueprint:"mutated"`
+
 	// Use clang lld instead of gnu ld.
 	Use_clang_lld *bool
 
@@ -69,12 +73,19 @@ func (lto *lto) begin(ctx BaseModuleContext) {
 	if ctx.Config().IsEnvTrue("DISABLE_LTO") {
 		lto.Properties.Lto.Never = boolPtr(true)
 	} else if ctx.Config().IsEnvTrue("GLOBAL_THINLTO") {
+		// GLOBAL_THINLTO selects device link units only. Static libraries take
+		// ThinLTO from ltoDepsMutator when a selected link unit consumes them.
+		// Static executables, tests, fuzz targets and CFI modules keep their
+		// existing non-LTO build, and a module that sets lto never, full or
+		// thin keeps its own choice.
 		staticLib := ctx.static() && !ctx.staticBinary()
 		hostBin := ctx.Host()
 		vndk := ctx.isVndk() // b/169217596
-		if !staticLib && !hostBin && !vndk {
-			if !lto.Never() && !lto.FullLTO() {
+		if !staticLib && !ctx.staticBinary() && !hostBin && !vndk &&
+			!ctx.isCfi() && !ctx.isTest() && !ctx.isFuzzer() {
+			if !lto.Never() && !lto.FullLTO() && !lto.ThinLTO() {
 				lto.Properties.Lto.Thin = boolPtr(true)
+				lto.Properties.GlobalThin = true
 			}
 		}
 	}
@@ -160,6 +171,16 @@ func (lto *lto) Never() bool {
 
 // Propagate lto requirements down from binaries
 func ltoDepsMutator(mctx android.TopDownMutatorContext) {
+	if m, ok := mctx.Module().(*Module); ok && m.lto != nil && m.lto.Properties.GlobalThin &&
+		m.sanitize != nil && Bool(m.sanitize.Properties.Sanitize.Fuzzer) {
+		// A module reached through a cc_fuzz target receives Sanitize.Fuzzer from
+		// the fuzzer variant mutator, which runs after begin() selected
+		// ThinLTO for it. lto.flags() drops LTO under -fsanitize=fuzzer-no-link,
+		// so the selection is withdrawn here before it creates ThinLTO
+		// variants of the static dependencies.
+		m.lto.Properties.Lto.Thin = nil
+		m.lto.Properties.GlobalThin = false
+	}
 	if m, ok := mctx.Module().(*Module); ok && m.lto.LTO() {
 		full := m.lto.FullLTO()
 		thin := m.lto.ThinLTO()
