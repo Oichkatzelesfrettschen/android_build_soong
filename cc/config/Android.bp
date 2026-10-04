@@ -33,6 +33,7 @@ bootstrap_go_package {
         "arm64_linux_host.go",
     ],
     testSrcs: [
+        "clang_warnings_test.go",
         "tidy_test.go",
     ],
     visibility: [

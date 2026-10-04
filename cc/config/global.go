@@ -15,8 +15,10 @@
 package config
 
 import (
+	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 
 	"android/soong/android"
@@ -370,6 +372,33 @@ var (
 		"-Wno-fortify-source",
 	}
 
+	// Warnings each newer clang adds, carried from lineage-24.0's
+	// noOverrideGlobalCflags. clangNewWarningCflags applies a block only
+	// when LLVM_PREBUILTS_VERSION selects that revision or a later one, so
+	// a build on ClangDefaultVersion never passes a flag name its compiler
+	// does not know.
+	clangNewWarningBlocks = []struct {
+		revision int
+		cflags   []string
+	}{
+		{563880, []string{
+			"-Wno-nontrivial-memcall",
+			"-Wno-invalid-specialization",
+		}},
+		{574158, []string{
+			"-Wno-unterminated-string-initialization",
+			"-Wno-implicit-int-conversion-on-negation",
+			"-Wno-default-const-init-field-unsafe",
+			"-Wno-default-const-init-var-unsafe",
+			"-Wno-preferred-type-bitfield-enum-conversion",
+			"-Wno-implicit-enum-enum-cast",
+		}},
+		{584948, []string{
+			"-Wno-character-conversion",              // http://b/452740154
+			"-Wno-error=uninitialized-const-pointer", // http://b/458489157
+		}},
+	}
+
 	llvmNextExtraCommonGlobalCflags = []string{
 		// Do not report warnings when testing with the top of trunk LLVM.
 		"-Wno-everything",
@@ -466,9 +495,10 @@ func init() {
 	})
 
 	pctx.VariableFunc("NoOverrideGlobalCflags", func(ctx android.PackageVarContext) string {
-		flags := noOverrideGlobalCflags
+		flags := append(append([]string{}, noOverrideGlobalCflags...),
+			clangNewWarningCflags(ctx.Config().Getenv("LLVM_PREBUILTS_VERSION"))...)
 		if ctx.Config().IsEnvTrue("LLVM_NEXT") {
-			flags = append(noOverrideGlobalCflags, llvmNextExtraCommonGlobalCflags...)
+			flags = append(flags, llvmNextExtraCommonGlobalCflags...)
 			IllegalFlags = []string{} // Don't fail build while testing a new compiler.
 		}
 		return strings.Join(flags, " ")
@@ -565,3 +595,25 @@ func clangPath(ctx android.PathContext) android.SourcePath {
 		return android.PathForSource(ctx, clangBase, ctx.Config().PrebuiltOS(), clangVersion)
 	})
 }
+
+// clangNewWarningCflags returns the clangNewWarningBlocks entries whose
+// revision is at or below the one a "clang-r<N>[suffix]" version names.
+func clangNewWarningCflags(version string) []string {
+	m := clangRevisionRegexp.FindStringSubmatch(version)
+	if m == nil {
+		return nil
+	}
+	revision, err := strconv.Atoi(m[1])
+	if err != nil {
+		return nil
+	}
+	var flags []string
+	for _, block := range clangNewWarningBlocks {
+		if revision >= block.revision {
+			flags = append(flags, block.cflags...)
+		}
+	}
+	return flags
+}
+
+var clangRevisionRegexp = regexp.MustCompile(`^clang-r([0-9]+)[a-z]*$`)
