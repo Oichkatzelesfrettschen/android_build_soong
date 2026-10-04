@@ -72,3 +72,47 @@ func TestGlobalThinLtoUpstreamExclusions(t *testing.T) {
 		}
 	}
 }
+
+func TestGlobalThinLtoSkipsFuzzTargets(t *testing.T) {
+	blueprint := `
+		cc_fuzz { name: "global_fuzzer", srcs: ["fuzz.c"] }
+		cc_binary { name: "sanitized_fuzzer", srcs: ["fuzz.c"], sanitize: { fuzzer: true } }
+	`
+	config := TestConfig(buildDir, android.Android, map[string]string{"GLOBAL_THINLTO": "true"}, blueprint, nil)
+	context := testCcWithConfig(t, config)
+	for _, name := range []string{"global_fuzzer", "sanitized_fuzzer"} {
+		for _, variant := range context.ModuleVariantsForTests(name) {
+			module, ok := context.ModuleForTests(name, variant).Module().(*Module)
+			if !ok || module.lto == nil || module.Target().Os != android.Android {
+				continue
+			}
+			if Bool(module.lto.Properties.Lto.Thin) || module.lto.Properties.GlobalThin {
+				t.Errorf("%s %s: GLOBAL_THINLTO selected ThinLTO for a fuzz target", name, variant)
+			}
+		}
+	}
+}
+
+func TestGlobalThinLtoKeepsModuleSelectedPolicy(t *testing.T) {
+	blueprint := `
+		cc_library_shared { name: "libglobal", srcs: ["global.c"] }
+		cc_library_shared { name: "libexplicit", srcs: ["explicit.c"], lto: { thin: true } }
+	`
+	config := TestConfig(buildDir, android.Android, map[string]string{"GLOBAL_THINLTO": "true"}, blueprint, nil)
+	context := testCcWithConfig(t, config)
+	for _, module := range []struct {
+		name   string
+		global bool
+	}{
+		{"libglobal", true},
+		{"libexplicit", false},
+	} {
+		linked := context.ModuleForTests(module.name, "android_arm_armv7-a-neon_shared").Module().(*Module)
+		ldFlags := strings.Join(linked.flags.Local.LdFlags, " ")
+		hasImportLimit := strings.Contains(ldFlags, "-import-instr-limit=5")
+		hasZeroInline := strings.Contains(ldFlags, "-inline-threshold=0")
+		if hasImportLimit != module.global || hasZeroInline == module.global {
+			t.Errorf("%s ldflags %q: import limit=%t zero inline=%t, want global policy=%t", module.name, ldFlags, hasImportLimit, hasZeroInline, module.global)
+		}
+	}
+}

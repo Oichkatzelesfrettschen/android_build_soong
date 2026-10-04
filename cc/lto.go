@@ -50,6 +50,9 @@ type LTOProperties struct {
 	FullDep bool `blueprint:"mutated"`
 	ThinDep bool `blueprint:"mutated"`
 
+	// GlobalThin records that GLOBAL_THINLTO, not the module, selected ThinLTO.
+	GlobalThin bool `blueprint:"mutated"`
+
 	// Use clang lld instead of gnu ld.
 	Use_clang_lld *bool
 }
@@ -72,8 +75,9 @@ func (lto *lto) begin(ctx BaseModuleContext) {
 		}
 		staticLibrary := ctx.static() && !ctx.staticBinary()
 		if !staticLibrary && !ctx.staticBinary() && !ctx.Host() && !ctx.isVndk() && !ctx.isCfi() && !ctx.isTest() &&
-			!lto.Disabled() && !Bool(lto.Properties.Lto.Full) {
+			!ctx.isFuzzer() && !lto.Disabled() && !Bool(lto.Properties.Lto.Full) && !Bool(lto.Properties.Lto.Thin) {
 			lto.Properties.Lto.Thin = boolPtr(true)
+			lto.Properties.GlobalThin = true
 		}
 	}
 }
@@ -145,7 +149,7 @@ func (lto *lto) flags(ctx BaseModuleContext, flags Flags) Flags {
 		// Bound cross-unit imports in the experimental global ThinLTO build.
 		// Preserve the existing policy for module-selected LTO.
 		if !ctx.isPgoCompile() {
-			if ctx.Config().IsEnvTrue("GLOBAL_THINLTO") && Bool(lto.Properties.Lto.Thin) {
+			if lto.Properties.GlobalThin {
 				flags.Local.LdFlags = append(flags.Local.LdFlags, "-Wl,-plugin-opt,-import-instr-limit=5")
 			} else {
 				flags.Local.LdFlags = append(flags.Local.LdFlags,
