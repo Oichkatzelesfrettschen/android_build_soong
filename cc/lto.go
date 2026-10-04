@@ -65,7 +65,39 @@ func (lto *lto) props() []interface{} {
 func (lto *lto) begin(ctx BaseModuleContext) {
 	if ctx.Config().IsEnvTrue("DISABLE_LTO") {
 		lto.Properties.Lto.Never = boolPtr(true)
+	} else if ctx.Config().IsEnvTrue("GLOBAL_THINLTO") {
+		if globalThinLtoExcluded(ctx.ModuleDir(), ctx.ModuleName()) {
+			lto.Properties.Lto.Never = boolPtr(true)
+			return
+		}
+		staticLibrary := ctx.static() && !ctx.staticBinary()
+		if !staticLibrary && !ctx.staticBinary() && !ctx.Host() && !ctx.isVndk() && !ctx.isCfi() && !ctx.isTest() &&
+			!lto.Disabled() && !Bool(lto.Properties.Lto.Full) {
+			lto.Properties.Lto.Thin = boolPtr(true)
+		}
 	}
+}
+
+// The bionic runtime and framework JNI modules need their upstream ThinLTO
+// opt-outs with the Android 11 Clang toolchain. The disabled graph stays intact.
+func globalThinLtoExcluded(moduleDir, moduleName string) bool {
+	switch moduleDir {
+	case "bionic/libc":
+		return moduleName == "libc"
+	case "bionic/libdl":
+		return moduleName == "libdl" || moduleName == "libdl_android"
+	case "bionic/libm":
+		return moduleName == "libm"
+	case "bionic/linker":
+		return moduleName == "ld-android" || moduleName == "linker"
+	case "frameworks/base/core/jni":
+		return moduleName == "libandroid_runtime"
+	case "frameworks/base/media/jni":
+		return moduleName == "libmedia_jni"
+	case "frameworks/base/media/jni/audioeffect":
+		return moduleName == "libaudioeffect_jni"
+	}
+	return false
 }
 
 func (lto *lto) deps(ctx BaseModuleContext, deps Deps) Deps {
@@ -110,12 +142,16 @@ func (lto *lto) flags(ctx BaseModuleContext, flags Flags) Flags {
 			flags.Local.LdFlags = append(flags.Local.LdFlags, cachePolicyFormat+policy)
 		}
 
-		// If the module does not have a profile, be conservative and do not inline
-		// or unroll loops during LTO, in order to prevent significant size bloat.
+		// Bound cross-unit imports in the experimental global ThinLTO build.
+		// Preserve the existing policy for module-selected LTO.
 		if !ctx.isPgoCompile() {
-			flags.Local.LdFlags = append(flags.Local.LdFlags,
-				"-Wl,-plugin-opt,-inline-threshold=0",
-				"-Wl,-plugin-opt,-unroll-threshold=0")
+			if ctx.Config().IsEnvTrue("GLOBAL_THINLTO") && Bool(lto.Properties.Lto.Thin) {
+				flags.Local.LdFlags = append(flags.Local.LdFlags, "-Wl,-plugin-opt,-import-instr-limit=5")
+			} else {
+				flags.Local.LdFlags = append(flags.Local.LdFlags,
+					"-Wl,-plugin-opt,-inline-threshold=0",
+					"-Wl,-plugin-opt,-unroll-threshold=0")
+			}
 		}
 	}
 	return flags
