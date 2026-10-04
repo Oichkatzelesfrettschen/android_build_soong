@@ -443,13 +443,6 @@ func TransformSourceToObj(ctx android.ModuleContext, subdir string, srcFiles and
 	cppflags += " ${config.NoOverrideClangGlobalCflags}"
 	toolingCppflags += " ${config.NoOverrideClangGlobalCflags}"
 
-	if ctx.Os() == android.Linux {
-		if hostCppflags := config.LinuxGlibcClangCppflags(ctx.Config()); len(hostCppflags) > 0 {
-			cppflags += " " + strings.Join(hostCppflags, " ")
-			toolingCppflags += " " + strings.Join(hostCppflags, " ")
-		}
-	}
-
 	for i, srcFile := range srcFiles {
 		objFile := android.ObjPathWithExt(ctx, subdir, srcFile, "o")
 

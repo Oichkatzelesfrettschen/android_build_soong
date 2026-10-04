@@ -95,11 +95,25 @@ func TestClang11FlagStrings(t *testing.T) {
 	}
 }
 
+func TestClang14PassManagerSpelling(t *testing.T) {
+	cfg := clangTestConfig("14")
+	got := ClangFilterPassManagerCflags(cfg, []string{"-a", "-fexperimental-new-pass-manager",
+		"-fno-experimental-new-pass-manager", "-b"})
+	want := []string{"-a", "-flegacy-pass-manager", "-b"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ClangFilterPassManagerCflags with Clang 14 = %q, want %q", got, want)
+	}
+	if got := ClangFilterPassManagerCflags(clangTestConfig("22"),
+		[]string{"-fno-experimental-new-pass-manager"}); len(got) != 0 {
+		t.Errorf("ClangFilterPassManagerCflags with Clang 22 = %q, want none", got)
+	}
+}
+
 func TestClang22FlagStrings(t *testing.T) {
 	cfg := clangTestConfig("22")
 
 	for _, f := range clangExtraCflags(cfg) {
-		if android.InList(f, passManagerSelectorCflags) {
+		if f == "-fexperimental-new-pass-manager" || f == "-fno-experimental-new-pass-manager" {
 			t.Errorf("ClangExtraCflags carries %q, which Clang 22 rejects", f)
 		}
 	}

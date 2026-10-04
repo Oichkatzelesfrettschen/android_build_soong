@@ -261,31 +261,33 @@ var clang22NoOverrideCflags = []string{
 	"-Wno-non-c-typedef-for-linkage",
 }
 
-// passManagerSelectorCflags choose between the legacy and the new pass
-// manager.
-var passManagerSelectorCflags = []string{
-	"-fexperimental-new-pass-manager",
-	"-fno-experimental-new-pass-manager",
-}
-
 // ClangHasLegacyPassManager reports whether the compiler still carries the
 // legacy pass manager. Clang 15 removes it, so the new pass manager is the
-// only pipeline, and the Clang 22 driver rejects both selector flags as
-// unknown arguments.
+// only pipeline.
 func ClangHasLegacyPassManager(config android.Config) bool {
 	return ClangMajorVersion(config) < 15
 }
 
-// ClangFilterPassManagerCflags returns cflags without the pass manager
-// selectors when the compiler has no legacy pass manager, and cflags itself
-// otherwise.
+// ClangFilterPassManagerCflags rewrites the pass manager selectors for the
+// Clang release from ClangMajorVersion. Through Clang 13 the driver takes
+// -fexperimental-new-pass-manager and -fno-experimental-new-pass-manager.
+// Clang 14 removes both spellings, defaults to the new pass manager and
+// selects the legacy one with -flegacy-pass-manager. From Clang 15 no legacy
+// pass manager exists and both selectors are dropped.
 func ClangFilterPassManagerCflags(config android.Config, cflags []string) []string {
-	if ClangHasLegacyPassManager(config) {
+	major := ClangMajorVersion(config)
+	if major < 14 {
 		return cflags
 	}
 	ret := make([]string, 0, len(cflags))
 	for _, f := range cflags {
-		if !android.InList(f, passManagerSelectorCflags) {
+		switch f {
+		case "-fexperimental-new-pass-manager":
+		case "-fno-experimental-new-pass-manager":
+			if major == 14 {
+				ret = append(ret, "-flegacy-pass-manager")
+			}
+		default:
 			ret = append(ret, f)
 		}
 	}

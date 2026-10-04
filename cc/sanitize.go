@@ -507,9 +507,8 @@ func (sanitize *sanitize) flags(ctx ModuleContext, flags Flags) Flags {
 		flags.Local.CFlags = append(flags.Local.CFlags, "-fno-sanitize-coverage=stack-depth")
 
 		// TODO(b/133876586): Experimental PM breaks sanitizer coverage.
-		if config.ClangHasLegacyPassManager(ctx.Config()) {
-			flags.Local.CFlags = append(flags.Local.CFlags, "-fno-experimental-new-pass-manager")
-		}
+		flags.Local.CFlags = append(flags.Local.CFlags,
+			config.ClangFilterPassManagerCflags(ctx.Config(), []string{"-fno-experimental-new-pass-manager"})...)
 
 		// Disable fortify for fuzzing builds. Generally, we'll be building with
 		// UBSan or ASan here and the fortify checks pollute the stack traces.
