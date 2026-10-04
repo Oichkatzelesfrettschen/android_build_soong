@@ -381,10 +381,14 @@ var (
 		revision int
 		cflags   []string
 	}{
+		// AOSP build/soong 68724accea43, "Set up flags for clang-r563880",
+		// http://b/401330760.
 		{563880, []string{
 			"-Wno-nontrivial-memcall",
 			"-Wno-invalid-specialization",
 		}},
+		// AOSP build/soong bafc5923a752, "Ignore warnings that were
+		// introduced in r574158", http://b/430598176.
 		{574158, []string{
 			"-Wno-unterminated-string-initialization",
 			"-Wno-implicit-int-conversion-on-negation",
@@ -393,6 +397,8 @@ var (
 			"-Wno-preferred-type-bitfield-enum-conversion",
 			"-Wno-implicit-enum-enum-cast",
 		}},
+		// AOSP build/soong 2fd148b6ad8b, "Turn off warnings causing build
+		// errors in r584948", http://b/445718771, with each flag's own bug.
 		{584948, []string{
 			"-Wno-character-conversion",              // http://b/452740154
 			"-Wno-error=uninitialized-const-pointer", // http://b/458489157
