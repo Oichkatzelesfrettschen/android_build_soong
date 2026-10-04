@@ -147,6 +147,19 @@ func init() {
 	pctx.StaticVariable("LinuxX8664YasmFlags", "-f elf64 -m amd64")
 }
 
+// LinuxGlibcClangCppflags returns the linux_glibc C++ flags that depend on the
+// Clang release from ClangMajorVersion. Clang 22's resource <stdatomic.h>
+// defines C11 macros such as kill_dependency in C++ mode, and those macros
+// break libc++'s <atomic>. The glibc 2.17 sysroot has no <stdatomic.h>, so the
+// resource header is the one a host C++ include finds. Defining its include
+// guard __CLANG_STDATOMIC_H leaves C++ with libc++'s <atomic> alone.
+func LinuxGlibcClangCppflags(config android.Config) []string {
+	if ClangMajorVersion(config) < 22 {
+		return nil
+	}
+	return []string{"-D__CLANG_STDATOMIC_H"}
+}
+
 type toolchainLinux struct {
 	cFlags, ldFlags string
 }

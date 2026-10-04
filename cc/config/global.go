@@ -15,6 +15,8 @@
 package config
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
 	"android/soong/android"
@@ -157,24 +159,7 @@ func init() {
 	pctx.StaticVariable("HostGlobalLldflags", strings.Join(hostGlobalLldflags, " "))
 
 	pctx.VariableFunc("CommonClangGlobalCflags", func(ctx android.PackageVarContext) string {
-		flags := ClangFilterUnknownCflags(commonGlobalCflags)
-		flags = append(flags, "${ClangExtraCflags}")
-
-		// http://b/131390872
-		// Automatically initialize any uninitialized stack variables.
-		// Prefer zero-init if multiple options are set.
-		if ctx.Config().IsEnvTrue("AUTO_ZERO_INITIALIZE") {
-			flags = append(flags, "-ftrivial-auto-var-init=zero -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang")
-		} else if ctx.Config().IsEnvTrue("AUTO_PATTERN_INITIALIZE") {
-			flags = append(flags, "-ftrivial-auto-var-init=pattern")
-		} else if ctx.Config().IsEnvTrue("AUTO_UNINITIALIZE") {
-			flags = append(flags, "-ftrivial-auto-var-init=uninitialized")
-		} else {
-			// Default to zero initialization.
-			flags = append(flags, "-ftrivial-auto-var-init=zero -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang")
-		}
-
-		return strings.Join(flags, " ")
+		return commonClangGlobalCflags(ctx.Config())
 	})
 
 	pctx.VariableFunc("DeviceClangGlobalCflags", func(ctx android.PackageVarContext) string {
@@ -283,4 +268,64 @@ func envOverrideFunc(envVar, defaultVal string) func(ctx android.PackageVarConte
 		}
 		return defaultVal
 	}
+}
+
+func commonClangGlobalCflags(config android.Config) string {
+	flags := ClangFilterUnknownCflags(commonGlobalCflags)
+	flags = append(flags, "${ClangExtraCflags}")
+
+	// Clang releases before 16 accept -ftrivial-auto-var-init=zero only
+	// together with the opt-in flag below. Clang 16 drops that requirement,
+	// and the Clang 22 driver rejects the opt-in flag as an unknown argument.
+	zeroInit := "-ftrivial-auto-var-init=zero"
+	if ClangMajorVersion(config) < 16 {
+		zeroInit += " -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang"
+	}
+
+	// http://b/131390872
+	// Automatically initialize any uninitialized stack variables.
+	// Prefer zero-init if multiple options are set.
+	if config.IsEnvTrue("AUTO_ZERO_INITIALIZE") {
+		flags = append(flags, zeroInit)
+	} else if config.IsEnvTrue("AUTO_PATTERN_INITIALIZE") {
+		flags = append(flags, "-ftrivial-auto-var-init=pattern")
+	} else if config.IsEnvTrue("AUTO_UNINITIALIZE") {
+		flags = append(flags, "-ftrivial-auto-var-init=uninitialized")
+	} else {
+		// Default to zero initialization.
+		flags = append(flags, zeroInit)
+	}
+
+	return strings.Join(flags, " ")
+}
+
+// ClangMajorVersion returns the major release of the Clang that compiles the
+// tree: the leading integer of LLVM_RELEASE_VERSION when that variable is
+// set, and of ClangDefaultShortVersion otherwise. Flags whose acceptance
+// differs between Clang releases select on this value. A value without a
+// leading integer panics, since every compile flag set depends on it.
+func ClangMajorVersion(config android.Config) int {
+	version := config.Getenv("LLVM_RELEASE_VERSION")
+	if version == "" {
+		version = ClangDefaultShortVersion
+	}
+	major, err := parseClangMajorVersion(version)
+	if err != nil {
+		panic(err)
+	}
+	return major
+}
+
+// parseClangMajorVersion reads the leading decimal integer of a Clang short
+// version such as "11.0.2" or "22".
+func parseClangMajorVersion(version string) (int, error) {
+	end := strings.IndexFunc(version, func(r rune) bool { return r < '0' || r > '9' })
+	if end < 0 {
+		end = len(version)
+	}
+	major, err := strconv.Atoi(version[:end])
+	if err != nil {
+		return 0, fmt.Errorf("LLVM_RELEASE_VERSION %q does not start with a Clang major version", version)
+	}
+	return major, nil
 }

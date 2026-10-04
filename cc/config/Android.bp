@@ -27,6 +27,7 @@ bootstrap_go_package {
         "x86_windows_host.go",
     ],
     testSrcs: [
+        "clang_version_test.go",
         "tidy_test.go",
     ],
 }

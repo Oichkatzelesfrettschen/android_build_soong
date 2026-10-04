@@ -87,6 +87,24 @@ func init() {
 	})
 }
 
+// TidyChecksDisabledForClang returns the clang-tidy check exclusions that the
+// Clang release from ClangMajorVersion requires. Clang 22's clang-tidy runs
+// these checks under the misc-*, bugprone-* and cert-* globs that module
+// tidy_checks enable, frequently as errors through tidy_checks_as_errors; the
+// checks postdate Clang 11 and tree sources trip them.
+func TidyChecksDisabledForClang(config android.Config) []string {
+	if ClangMajorVersion(config) < 22 {
+		return nil
+	}
+	return []string{
+		"-misc-const-correctness",
+		"-misc-include-cleaner",
+		"-bugprone-easily-swappable-parameters",
+		"-cert-int09-c",
+		"-cert-err33-c",
+	}
+}
+
 type PathBasedTidyCheck struct {
 	PathPrefix string
 	Checks     string
