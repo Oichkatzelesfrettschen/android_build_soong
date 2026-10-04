@@ -332,6 +332,9 @@ type ModuleContextIntf interface {
 	baseModuleName() string
 	getVndkExtendsModuleName() string
 	isPgoCompile() bool
+	isCfi() bool
+	isFuzzer() bool
+	isTest() bool
 	isNDKStubLibrary() bool
 	useClangLld(actx ModuleContext) bool
 	isForPlatform() bool
@@ -1166,6 +1169,27 @@ func (ctx *moduleContextImpl) isVndk() bool {
 
 func (ctx *moduleContextImpl) isPgoCompile() bool {
 	return ctx.mod.isPgoCompile()
+}
+
+func (ctx *moduleContextImpl) isCfi() bool {
+	return ctx.mod.sanitize != nil && Bool(ctx.mod.sanitize.Properties.Sanitize.Cfi)
+}
+
+// A cc_fuzz binary or a module built with the fuzzer sanitizer links
+// -fsanitize=fuzzer-no-link, which sanitize.flags() keeps apart from LTO.
+func (ctx *moduleContextImpl) isFuzzer() bool {
+	if _, ok := ctx.mod.linker.(*fuzzBinary); ok {
+		return true
+	}
+	return ctx.mod.sanitize != nil && Bool(ctx.mod.sanitize.Properties.Sanitize.Fuzzer)
+}
+
+func (ctx *moduleContextImpl) isTest() bool {
+	switch ctx.mod.linker.(type) {
+	case *testBinary, *testLibrary:
+		return true
+	}
+	return false
 }
 
 func (ctx *moduleContextImpl) isNDKStubLibrary() bool {
