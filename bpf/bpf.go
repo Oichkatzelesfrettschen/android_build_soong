@@ -159,6 +159,14 @@ func (bpf *bpf) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 		"-Werror",
 		"-Wextra",
 
+		// BPF ISA v1, the default up to clang-r536225: atomic adds encode as
+		// BPF_XADD with imm 0 and arithmetic stays 64-bit. clang-r584948
+		// defaults to v3, which emits BPF_ATOMIC with BPF_FETCH in imm plus
+		// ALU32/JMP32; a verifier older than Linux 5.12 rejects the former
+		// ("BPF_STX uses reserved fields"), so the tethering programs fail to
+		// load and the boot stops.
+		"-mcpu=v1",
+
 		"-isystem bionic/libc/include",
 		"-isystem bionic/libc/kernel/uapi",
 		// The architecture doesn't matter here, but asm/types.h is included by linux/types.h.
