@@ -1461,9 +1461,12 @@ func (ctx *moduleContextImpl) isFuzzer() bool {
 	return ctx.mod.sanitize != nil && Bool(ctx.mod.sanitize.Properties.Sanitize.Fuzzer)
 }
 
+// isTest reports test binaries, test libraries and benchmarks. A
+// benchmarkDecorator embeds binaryDecorator rather than testDecorator, so
+// Module.testBinary() does not cover it.
 func (ctx *moduleContextImpl) isTest() bool {
 	switch ctx.mod.linker.(type) {
-	case *testBinary, *testLibrary:
+	case *testBinary, *testLibrary, *benchmarkDecorator:
 		return true
 	}
 	return false

@@ -45,6 +45,7 @@ func TestGlobalThinLtoOptIn(t *testing.T) {
 		cc_binary { name: "dynamic_binary", srcs: ["dynamic_binary.c"] }
 		cc_binary_host { name: "host_binary", srcs: ["host.c"] }
 		cc_test { name: "global_test", srcs: ["test.c"], gtest: false }
+		cc_benchmark { name: "global_benchmark", srcs: ["benchmark.c"] }
 	`
 	for _, enabled := range []bool{false, true} {
 		result := android.GroupFixturePreparers(
@@ -65,6 +66,7 @@ func TestGlobalThinLtoOptIn(t *testing.T) {
 			{"static_binary", "android_arm64_armv8-a", false},
 			{"dynamic_binary", "android_arm64_armv8-a", enabled},
 			{"global_test", "android_arm64_armv8-a", false},
+			{"global_benchmark", "android_arm64_armv8-a", false},
 		} {
 			flags := ltoFlagsOf(result, module.name, module.variant)
 			if got := strings.Contains(flags, "-flto=thin"); got != module.thin {
