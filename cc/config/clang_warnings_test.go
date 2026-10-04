@@ -35,3 +35,22 @@ func TestClangNewWarningCflags(t *testing.T) {
 		}
 	}
 }
+
+func TestClangWarningInventoryCflags(t *testing.T) {
+	got := clangWarningInventoryCflags([]string{
+		"-Wno-character-conversion",
+		"-Wno-error=uninitialized-const-pointer",
+	})
+	want := []string{
+		"-Wno-error=character-conversion",
+		"-Wno-error=uninitialized-const-pointer",
+		"-Wno-error",
+		"-ferror-limit=0",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("clangWarningInventoryCflags = %q, want %q", got, want)
+	}
+	if got := clangWarningInventoryCflags(nil); !reflect.DeepEqual(got, []string{"-Wno-error", "-ferror-limit=0"}) {
+		t.Errorf("clangWarningInventoryCflags(nil) = %q", got)
+	}
+}

@@ -495,8 +495,11 @@ func init() {
 	})
 
 	pctx.VariableFunc("NoOverrideGlobalCflags", func(ctx android.PackageVarContext) string {
-		flags := append(append([]string{}, noOverrideGlobalCflags...),
-			clangNewWarningCflags(ctx.Config().Getenv("LLVM_PREBUILTS_VERSION"))...)
+		newWarnings := clangNewWarningCflags(ctx.Config().Getenv("LLVM_PREBUILTS_VERSION"))
+		if ctx.Config().IsEnvTrue("CLANG_WARNING_INVENTORY") {
+			newWarnings = clangWarningInventoryCflags(newWarnings)
+		}
+		flags := append(append([]string{}, noOverrideGlobalCflags...), newWarnings...)
 		if ctx.Config().IsEnvTrue("LLVM_NEXT") {
 			flags = append(flags, llvmNextExtraCommonGlobalCflags...)
 			IllegalFlags = []string{} // Don't fail build while testing a new compiler.
@@ -617,3 +620,22 @@ func clangNewWarningCflags(version string) []string {
 }
 
 var clangRevisionRegexp = regexp.MustCompile(`^clang-r([0-9]+)[a-z]*$`)
+
+// clangWarningInventoryCflags turns a build into a warning inventory: each
+// "-Wno-<name>" from the new-clang blocks becomes "-Wno-error=<name>", so the
+// warning is reported instead of silenced, and "-Wno-error" plus
+// "-ferror-limit=0" follow. NoOverrideGlobalCflags comes after every module's
+// own cflags, so the "-Wno-error" overrides a module's "-Werror"; explicit
+// "-Werror=<name>" flags keep failing, and every translation unit reports all
+// of its diagnostics. Warnings do not change code generation, so the products
+// stay bootable.
+func clangWarningInventoryCflags(newWarnings []string) []string {
+	flags := make([]string, 0, len(newWarnings)+2)
+	for _, f := range newWarnings {
+		if name, ok := strings.CutPrefix(f, "-Wno-"); ok && !strings.HasPrefix(name, "error=") {
+			f = "-Wno-error=" + name
+		}
+		flags = append(flags, f)
+	}
+	return append(flags, "-Wno-error", "-ferror-limit=0")
+}
