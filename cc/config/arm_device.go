@@ -149,11 +149,9 @@ var (
 		"krait": []string{
 			"-mcpu=krait",
 			"-mfpu=neon-vfpv4",
-			// Fake an ARM compiler flag as these processors support LPAE which clang
-			// don't advertise.
-			// TODO This is a hack and we need to add it for each processor that supports LPAE until some
-			// better solution comes around. See Bug 27340895
-			"-D__ARM_FEATURE_LPAE=1",
+			// Krait implements no LPAE (ID_MMFR0[3:0] reads 4 on MSM8974), so
+			// __ARM_FEATURE_LPAE stays undefined and ART's QuasiAtomic keeps
+			// LDREXD/STREXD for 64-bit atomics.
 		},
 		"kryo": []string{
 			// Use cortex-a53 because the GNU assembler doesn't recognize -mcpu=kryo
