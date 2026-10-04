@@ -984,7 +984,12 @@ func (j *Module) compile(ctx android.ModuleContext, aaptSrcJar android.Path) {
 		}
 
 		if enableSharding {
-			flags.classpath = append(flags.classpath, headerJarFileWithoutJarjar)
+			// A shard resolves the module's classes from other shards through
+			// this header jar. It goes first, so a same-named class in a
+			// dependency (an AIDL parcelable that shares a framework class
+			// name, for example) never shadows the module's own class, as the
+			// module's sources would shadow it in an unsharded javac.
+			flags.classpath = append(classpath{headerJarFileWithoutJarjar}, flags.classpath...)
 			shardSize := int(*(j.properties.Javac_shard_size))
 			var shardSrcs []android.Paths
 			if len(uniqueSrcFiles) > 0 {
