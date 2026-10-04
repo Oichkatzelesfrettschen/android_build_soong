@@ -131,7 +131,7 @@ func TestClang22FlagStrings(t *testing.T) {
 	if got := TidyChecksDisabledForClang(cfg); !reflect.DeepEqual(got, wantTidy) {
 		t.Errorf("TidyChecksDisabledForClang = %q, want %q", got, wantTidy)
 	}
-	if got, want := LinuxGlibcClangCppflags(cfg), []string{"-D__CLANG_STDATOMIC_H"}; !reflect.DeepEqual(got, want) {
+	if got, want := LinuxGlibcClangCppflags(cfg), []string{"-isystem build/soong/cc/config/hostcxx"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("LinuxGlibcClangCppflags = %q, want %q", got, want)
 	}
 }

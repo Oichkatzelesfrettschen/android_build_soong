@@ -151,13 +151,15 @@ func init() {
 // Clang release from ClangMajorVersion. Clang 22's resource <stdatomic.h>
 // defines C11 macros such as kill_dependency in C++ mode, and those macros
 // break libc++'s <atomic>. The glibc 2.17 sysroot has no <stdatomic.h>, so the
-// resource header is the one a host C++ include finds. Defining its include
-// guard __CLANG_STDATOMIC_H leaves C++ with libc++'s <atomic> alone.
+// resource header is the one a host C++ include finds. cc/config/hostcxx
+// holds a <stdatomic.h> that forwards to bionic's, which maps the C11 names
+// onto libc++'s <atomic> under C++; -isystem places it ahead of the resource
+// directory.
 func LinuxGlibcClangCppflags(config android.Config) []string {
 	if ClangMajorVersion(config) < 22 {
 		return nil
 	}
-	return []string{"-D__CLANG_STDATOMIC_H"}
+	return []string{"-isystem build/soong/cc/config/hostcxx"}
 }
 
 type toolchainLinux struct {
