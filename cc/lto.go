@@ -171,6 +171,16 @@ func (lto *lto) Never() bool {
 
 // Propagate lto requirements down from binaries
 func ltoDepsMutator(mctx android.TopDownMutatorContext) {
+	if m, ok := mctx.Module().(*Module); ok && m.lto != nil && m.lto.Properties.GlobalThin &&
+		m.sanitize != nil && Bool(m.sanitize.Properties.Sanitize.Fuzzer) {
+		// A module reached through a cc_fuzz target receives Sanitize.Fuzzer from
+		// the fuzzer variant mutator, which runs after begin() selected
+		// ThinLTO for it. lto.flags() drops LTO under -fsanitize=fuzzer-no-link,
+		// so the selection is withdrawn here before it creates ThinLTO
+		// variants of the static dependencies.
+		m.lto.Properties.Lto.Thin = nil
+		m.lto.Properties.GlobalThin = false
+	}
 	if m, ok := mctx.Module().(*Module); ok && m.lto.LTO() {
 		full := m.lto.FullLTO()
 		thin := m.lto.ThinLTO()

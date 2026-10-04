@@ -137,3 +137,52 @@ func TestGlobalThinLtoKeepsImportLimit(t *testing.T) {
 		}
 	}
 }
+
+// A shared library reached through a cc_fuzz target receives
+// Sanitize.Fuzzer after begin() has run, so its fuzzer variant must give up
+// the ThinLTO selection before ltoDepsMutator builds static dependencies for it.
+func TestGlobalThinLtoSkipsFuzzerSharedLibs(t *testing.T) {
+	bp := `
+		cc_fuzz { name: "fuzzer", srcs: ["fuzz.c"], shared_libs: ["libfuzzed"] }
+		cc_library_shared { name: "libfuzzed", srcs: ["fuzzed.c"], static_libs: ["libfuzzeddep"] }
+		cc_library_static { name: "libfuzzeddep", srcs: ["fuzzeddep.c"] }
+		cc_binary { name: "plain", srcs: ["plain.c"], shared_libs: ["libplain"] }
+		cc_library_shared { name: "libplain", srcs: ["plain_lib.c"], static_libs: ["libplaindep"] }
+		cc_library_static { name: "libplaindep", srcs: ["plaindep.c"] }
+	`
+	result := prepareForGlobalThinLtoTest(true).RunTestWithBp(t, bp)
+
+	// The non-fuzzer variants of libfuzzed and libfuzzeddep keep the global
+	// selection; only the variants the fuzz target links are checked.
+	for _, name := range []string{"fuzzer", "libfuzzed", "libfuzzeddep"} {
+		checked := 0
+		for _, variant := range ltoVariantsOf(result, name) {
+			if name != "fuzzer" && !strings.Contains(variant, "_fuzzer") {
+				continue
+			}
+			checked++
+			if strings.Contains(variant, "lto-") {
+				t.Errorf("%s variant %q: ThinLTO variant built for a fuzz target", name, variant)
+			}
+			module := result.ModuleForTests(name, variant).Module().(*Module)
+			if module.lto.ThinLTO() || module.lto.Properties.GlobalThin {
+				t.Errorf("%s %s keeps ThinLTO under a fuzz target", name, variant)
+			}
+			if flags := ltoFlagsOf(result, name, variant); strings.Contains(flags, "-flto") {
+				t.Errorf("%s %s cflags %q carry -flto under a fuzz target", name, variant, flags)
+			}
+		}
+		if checked == 0 {
+			t.Errorf("%s has no fuzzer variant on a 64-bit device", name)
+		}
+	}
+
+	// A fuzzer-free consumer of the same switch still selects ThinLTO.
+	thinDep := false
+	for _, variant := range ltoVariantsOf(result, "libplaindep") {
+		thinDep = thinDep || strings.HasSuffix(variant, "_lto-thin")
+	}
+	if !thinDep {
+		t.Errorf("libplaindep has no lto-thin variant; GLOBAL_THINLTO no longer selects non-fuzz link units")
+	}
+}
