@@ -126,10 +126,16 @@ func TestClang22FlagStrings(t *testing.T) {
 		t.Error("ClangHasLegacyPassManager = true, want false")
 	}
 
-	wantTidy := []string{"-misc-const-correctness", "-misc-include-cleaner",
-		"-bugprone-easily-swappable-parameters", "-cert-int09-c", "-cert-err33-c"}
-	if got := TidyChecksDisabledForClang(cfg); !reflect.DeepEqual(got, wantTidy) {
-		t.Errorf("TidyChecksDisabledForClang = %q, want %q", got, wantTidy)
+	gotTidy := TidyChecksDisabledForClang(cfg)
+	if len(gotTidy) != len(clangTidy22NewChecks) {
+		t.Errorf("TidyChecksDisabledForClang has %d exclusions, want %d", len(gotTidy), len(clangTidy22NewChecks))
+	}
+	for _, want := range []string{"-misc-const-correctness", "-misc-include-cleaner",
+		"-bugprone-easily-swappable-parameters", "-cert-int09-c", "-cert-err33-c",
+		"-misc-use-anonymous-namespace", "-clang-analyzer-security.ArrayBound"} {
+		if !inList(want, gotTidy) {
+			t.Errorf("TidyChecksDisabledForClang lacks %q", want)
+		}
 	}
 	if got, want := LinuxGlibcClangCppflags(cfg), []string{"-isystem build/soong/cc/config/hostcxx"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("LinuxGlibcClangCppflags = %q, want %q", got, want)

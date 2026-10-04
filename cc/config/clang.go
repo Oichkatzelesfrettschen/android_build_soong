@@ -256,6 +256,9 @@ var clang22NoOverrideCflags = []string{
 	"-Wno-thread-safety-reference-return",
 	"-Wno-unused-but-set-parameter",
 	"-Wno-character-conversion",
+	"-Wno-missing-template-arg-list-after-template-kw",
+	"-Wno-deprecated-this-capture",
+	"-Wno-non-c-typedef-for-linkage",
 }
 
 // passManagerSelectorCflags choose between the legacy and the new pass
