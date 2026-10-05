@@ -984,6 +984,15 @@ func (j *Module) compile(ctx android.ModuleContext, aaptSrcJar android.Path) {
 		}
 
 		if enableSharding {
+			// A shard resolves the module's classes from other shards through
+			// the turbine header jar of the module's own sources. It goes
+			// first, so a same-named class in a dependency (an AIDL parcelable
+			// that shares a framework class name, for example) never shadows
+			// the module's own class, as the module's sources shadow the
+			// classpath in an unsharded javac. The combined header jar, which
+			// adds the static libraries, keeps its place after the libs.
+			flags.classpath = append(classpath{android.PathForModuleOut(ctx, "turbine", jarName)},
+				flags.classpath...)
 			flags.classpath = append(flags.classpath, headerJarFileWithoutJarjar)
 			shardSize := int(*(j.properties.Javac_shard_size))
 			var shardSrcs []android.Paths

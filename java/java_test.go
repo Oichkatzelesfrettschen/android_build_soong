@@ -988,11 +988,15 @@ func TestSharding(t *testing.T) {
 		}
 		`)
 
+	barTurbineJar := filepath.Join("out", "soong", ".intermediates", "bar", "android_common", "turbine", "bar.jar")
 	barHeaderJar := filepath.Join("out", "soong", ".intermediates", "bar", "android_common", "turbine-combined", "bar.jar")
 	for i := 0; i < 3; i++ {
 		barJavac := ctx.ModuleForTests("bar", "android_common").Description("javac" + strconv.Itoa(i))
-		if !strings.Contains(barJavac.Args["classpath"], barHeaderJar) {
-			t.Errorf("bar javac classpath %v does not contain %q", barJavac.Args["classpath"], barHeaderJar)
+		if !strings.HasPrefix(barJavac.Args["classpath"], "-classpath "+barTurbineJar) {
+			t.Errorf("bar javac classpath %v does not start with %q", barJavac.Args["classpath"], barTurbineJar)
+		}
+		if !strings.HasSuffix(barJavac.Args["classpath"], ":"+barHeaderJar) {
+			t.Errorf("bar javac classpath %v does not end with %q", barJavac.Args["classpath"], barHeaderJar)
 		}
 	}
 }
