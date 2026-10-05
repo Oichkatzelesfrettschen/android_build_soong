@@ -703,6 +703,9 @@ func (compiler *baseCompiler) compilerFlags(ctx ModuleContext, flags Flags, deps
 				flags.Local.CFlags = append([]string{"-Werror"}, flags.Local.CFlags...)
 			}
 		}
+		// Follows the module's own cflags, so its -Werror keeps every other class.
+		flags.Local.CFlags = append(flags.Local.CFlags,
+			config.ClangNewWarningDirCflags(ctx.Config().Getenv("LLVM_PREBUILTS_VERSION"), ctx.ModuleDir())...)
 	}
 
 	if Bool(compiler.Properties.Openmp) {
