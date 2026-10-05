@@ -405,6 +405,34 @@ var (
 		}},
 	}
 
+	// Sites a strict build at a newer clang keeps from failing -Werror, one
+	// warning class in one module directory each, where this tree carries the
+	// project's source unchanged from its upstream. An entry applies only when
+	// LLVM_PREBUILTS_VERSION selects its revision or a later one, so a build on
+	// ClangDefaultVersion keeps its command lines.
+	clangNewWarningDirExceptions = []struct {
+		revision int
+		dir      string
+		cflags   []string
+	}{
+		// src/libANGLE/Fence.h: virtual ~FenceNV in a final class.
+		{584948, "external/angle", []string{"-Wno-error=unnecessary-virtual-specifier"}},
+		// external/federated-compute fcp/jni/jni_util.h, which these modules
+		// include: virtual ~ScopedJniEnv in a final class.
+		{584948, "packages/modules/OnDevicePersonalization/federatedcompute", []string{"-Wno-error=unnecessary-virtual-specifier"}},
+		// rtc_base/platform_thread.h: virtual ~PlatformThread in a final class.
+		{584948, "external/webrtc", []string{"-Wno-error=unnecessary-virtual-specifier"}},
+		// http.c: the overflow check "uri + slen < uri", which pointer
+		// arithmetic rules make always false.
+		{584948, "external/libevent", []string{"-Wno-error=tautological-compare"}},
+		// sgdisk.cc: main declared inside extern "C".
+		{584948, "external/gptfdisk", []string{"-Wno-error=main"}},
+		// lib/Support/regcomp.c: INFINITY redefined after <math.h>.
+		{584948, "external/llvm", []string{"-Wno-error=macro-redefined"}},
+		// reference-ril/reference-ril.c: atCommand unset on the switch default.
+		{584948, "hardware/ril", []string{"-Wno-error=sometimes-uninitialized"}},
+	}
+
 	llvmNextExtraCommonGlobalCflags = []string{
 		// Do not report warnings when testing with the top of trunk LLVM.
 		"-Wno-everything",
@@ -626,6 +654,27 @@ func clangNewWarningCflags(version string) []string {
 }
 
 var clangRevisionRegexp = regexp.MustCompile(`^clang-r([0-9]+)[a-z]*$`)
+
+// ClangNewWarningDirCflags returns the clangNewWarningDirExceptions cflags
+// for a module in dir when a "clang-r<N>[suffix]" version selects their
+// revision or a later one.
+func ClangNewWarningDirCflags(version, dir string) []string {
+	m := clangRevisionRegexp.FindStringSubmatch(version)
+	if m == nil {
+		return nil
+	}
+	revision, err := strconv.Atoi(m[1])
+	if err != nil {
+		return nil
+	}
+	var flags []string
+	for _, e := range clangNewWarningDirExceptions {
+		if revision >= e.revision && (dir == e.dir || strings.HasPrefix(dir, e.dir+"/")) {
+			flags = append(flags, e.cflags...)
+		}
+	}
+	return flags
+}
 
 // clangWarningInventoryCflags turns a build into a warning inventory: each
 // "-Wno-<name>" from the new-clang blocks becomes "-Wno-error=<name>", so the

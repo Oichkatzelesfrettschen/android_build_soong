@@ -36,6 +36,26 @@ func TestClangNewWarningCflags(t *testing.T) {
 	}
 }
 
+func TestClangNewWarningDirCflags(t *testing.T) {
+	virt := []string{"-Wno-error=unnecessary-virtual-specifier"}
+	for _, tc := range []struct {
+		version, dir string
+		want         []string
+	}{
+		{"clang-r584948", "external/angle", virt},
+		{"clang-r584948", "external/angle/src/libANGLE", virt},
+		{"clang-r584948b", "external/webrtc", virt},
+		{"clang-r584948", "external/angleproject", nil},
+		{"clang-r584948", "external/icu", nil},
+		{"clang-r536225", "external/angle", nil},
+		{"", "external/angle", nil},
+	} {
+		if got := ClangNewWarningDirCflags(tc.version, tc.dir); !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("ClangNewWarningDirCflags(%q, %q) = %q, want %q", tc.version, tc.dir, got, tc.want)
+		}
+	}
+}
+
 func TestClangWarningInventoryCflags(t *testing.T) {
 	got := clangWarningInventoryCflags([]string{
 		"-Wno-character-conversion",
