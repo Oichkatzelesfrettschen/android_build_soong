@@ -371,6 +371,11 @@ func (a *apexBundle) androidMkForType() android.AndroidMkData {
 				}
 				a.writeRequiredModules(w, name)
 				fmt.Fprintln(w, "include $(BUILD_PHONY_PACKAGE)")
+				if len(a.overridableProperties.Overrides) > 0 {
+					// Flattened APEX products install the phony module, so its
+					// overrides must participate in product-installed-files.
+					fmt.Fprintln(w, "PACKAGES."+name+a.suffix+".OVERRIDES :=", strings.Join(a.overridableProperties.Overrides, " "))
+				}
 
 			} else {
 				fmt.Fprintln(w, "\ninclude $(CLEAR_VARS)")

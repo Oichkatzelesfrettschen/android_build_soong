@@ -565,7 +565,7 @@ func (sanitize *sanitize) flags(ctx ModuleContext, flags Flags) Flags {
 			// TODO: put in flags?
 			flags.RequiredInstructionSet = "arm"
 		}
-		flags.Local.CFlags = append(flags.Local.CFlags, asanCflags...)
+		flags.Local.CFlags = append(flags.Local.CFlags, config.ClangFilterPassManagerCflags(ctx.Config(), asanCflags)...)
 		flags.Local.LdFlags = append(flags.Local.LdFlags, asanLdflags...)
 
 		if Bool(sanitize.Properties.Sanitize.Writeonly) {
@@ -590,7 +590,7 @@ func (sanitize *sanitize) flags(ctx ModuleContext, flags Flags) Flags {
 	}
 
 	if Bool(sanitize.Properties.Sanitize.Hwaddress) {
-		flags.Local.CFlags = append(flags.Local.CFlags, hwasanCflags...)
+		flags.Local.CFlags = append(flags.Local.CFlags, config.ClangFilterPassManagerCflags(ctx.Config(), hwasanCflags)...)
 		if Bool(sanitize.Properties.Sanitize.Writeonly) {
 			flags.Local.CFlags = append(flags.Local.CFlags, "-mllvm", "-hwasan-instrument-reads=0")
 		}
@@ -612,7 +612,8 @@ func (sanitize *sanitize) flags(ctx ModuleContext, flags Flags) Flags {
 		flags.Local.CFlags = append(flags.Local.CFlags, "-fno-sanitize-coverage=stack-depth")
 
 		// TODO(b/133876586): Experimental PM breaks sanitizer coverage.
-		flags.Local.CFlags = append(flags.Local.CFlags, "-fno-experimental-new-pass-manager")
+		flags.Local.CFlags = append(flags.Local.CFlags,
+			config.ClangFilterPassManagerCflags(ctx.Config(), []string{"-fno-experimental-new-pass-manager"})...)
 
 		// Disable fortify for fuzzing builds. Generally, we'll be building with
 		// UBSan or ASan here and the fortify checks pollute the stack traces.

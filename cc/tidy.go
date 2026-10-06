@@ -153,6 +153,11 @@ func (tidy *tidyFeature) flags(ctx ModuleContext, flags Flags) Flags {
 	tidyChecks = tidyChecks + ",-bugprone-signed-char-misuse"
 	// http://b/155034972
 	tidyChecks = tidyChecks + ",-bugprone-branch-clone"
+	// Module tidy_checks follow the defaults and may restart from "-*", so a
+	// check that must stay off for every module is excluded after them.
+	if disabled := config.TidyChecksDisabledForClang(ctx.Config()); len(disabled) > 0 {
+		tidyChecks = tidyChecks + "," + strings.Join(disabled, ",")
+	}
 	flags.TidyFlags = append(flags.TidyFlags, tidyChecks)
 
 	if ctx.Config().IsEnvTrue("WITH_TIDY") {

@@ -422,6 +422,10 @@ func (compiler *baseCompiler) compilerFlags(ctx ModuleContext, flags Flags, deps
 	flags.Local.ConlyFlags = config.ClangFilterUnknownCflags(flags.Local.ConlyFlags)
 	flags.Local.LdFlags = config.ClangFilterUnknownCflags(flags.Local.LdFlags)
 
+	// Module cflags can name the pass manager selectors, which the compiler
+	// drops or respells from Clang 14. The filter returns its input for earlier
+	// releases.
+
 	target := "-target " + tc.ClangTriple()
 	if ctx.Os().Class == android.Device {
 		version := ctx.minSdkVersion()
@@ -469,6 +473,9 @@ func (compiler *baseCompiler) compilerFlags(ctx ModuleContext, flags Flags, deps
 	flags.Global.AsFlags = append(flags.Global.AsFlags, "-D__ASSEMBLY__")
 
 	flags.Global.CppFlags = append(flags.Global.CppFlags, tc.ClangCppflags())
+	if ctx.Os() == android.Linux {
+		flags.Global.CppFlags = append(flags.Global.CppFlags, config.LinuxGlibcClangCppflags(ctx.Config())...)
+	}
 
 	flags.Global.YasmFlags = append(flags.Global.YasmFlags, tc.YasmFlags())
 
@@ -512,6 +519,12 @@ func (compiler *baseCompiler) compilerFlags(ctx ModuleContext, flags Flags, deps
 	if ctx.inVendorRamdisk() {
 		flags.Local.CFlags = append(flags.Local.CFlags, esc(compiler.Properties.Target.Vendor_ramdisk.Cflags)...)
 	}
+
+	// Every module cflags source, the target-specific ones included, has
+	// been appended; rewrite the pass manager selectors for the Clang release.
+	flags.Local.CFlags = config.ClangFilterPassManagerCflags(ctx.Config(), flags.Local.CFlags)
+	flags.Local.CppFlags = config.ClangFilterPassManagerCflags(ctx.Config(), flags.Local.CppFlags)
+	flags.Local.ConlyFlags = config.ClangFilterPassManagerCflags(ctx.Config(), flags.Local.ConlyFlags)
 
 	// We can enforce some rules more strictly in the code we own. strict
 	// indicates if this is code that we can be stricter with. If we have

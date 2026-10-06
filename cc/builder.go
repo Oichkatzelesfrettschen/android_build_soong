@@ -693,7 +693,13 @@ func transformObjToStaticLib(ctx android.ModuleContext,
 	arCmd := "${config.ClangBin}/llvm-ar"
 	arFlags := ""
 	if !ctx.Darwin() {
-		arFlags += " -format=gnu"
+		// Clang 22's llvm-ar parses only the double-dash --format spelling;
+		// earlier releases accept both, so only the newer line changes.
+		if config.ClangMajorVersion(ctx.Config()) >= 22 {
+			arFlags += " --format=gnu"
+		} else {
+			arFlags += " -format=gnu"
+		}
 	}
 
 	if len(wholeStaticLibs) == 0 {

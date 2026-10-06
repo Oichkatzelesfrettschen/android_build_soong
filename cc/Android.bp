@@ -84,6 +84,8 @@ bootstrap_go_package {
     ],
     testSrcs: [
         "cc_test.go",
+        "clang_release_test.go",
+        "lto_test.go",
         "compiler_test.go",
         "gen_test.go",
         "genrule_test.go",

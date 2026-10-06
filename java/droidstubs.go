@@ -408,6 +408,7 @@ func metalavaCmd(ctx android.ModuleContext, rule *android.RuleBuilder, javaVersi
 		rule.Rewrapper(&remoteexec.REParams{
 			Labels:          labels,
 			ExecStrategy:    execStrategy,
+			OutputFiles:     []string{"$out"},
 			ToolchainInputs: []string{config.JavaCmd(ctx).String()},
 			Platform:        map[string]string{remoteexec.PoolKey: pool},
 		})

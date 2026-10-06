@@ -5606,14 +5606,14 @@ func TestOverrideApex(t *testing.T) {
 	ensureNotContains(t, copyCmds, "image.apex/app/app/app.apk")
 	ensureContains(t, copyCmds, "image.apex/app/override_app/override_app.apk")
 
-	apexBundle := module.Module().(*apexBundle)
-	name := apexBundle.Name()
+	overriddenApex := module.Module().(*apexBundle)
+	name := overriddenApex.Name()
 	if name != "override_myapex" {
 		t.Errorf("name should be \"override_myapex\", but was %q", name)
 	}
 
-	if apexBundle.overridableProperties.Logging_parent != "com.foo.bar" {
-		t.Errorf("override_myapex should have logging parent (com.foo.bar), but was %q.", apexBundle.overridableProperties.Logging_parent)
+	if overriddenApex.overridableProperties.Logging_parent != "com.foo.bar" {
+		t.Errorf("override_myapex should have logging parent (com.foo.bar), but was %q.", overriddenApex.overridableProperties.Logging_parent)
 	}
 
 	optFlags := apexRule.Args["opt_flags"]
@@ -5623,7 +5623,7 @@ func TestOverrideApex(t *testing.T) {
 	signApkRule := module.Rule("signapk")
 	ensureEquals(t, signApkRule.Args["certificates"], "testkey.x509.pem testkey.pk8")
 
-	data := android.AndroidMkDataForTest(t, ctx, apexBundle)
+	data := android.AndroidMkDataForTest(t, ctx, overriddenApex)
 	var builder strings.Builder
 	data.Custom(&builder, name, "TARGET_", "", data)
 	androidMk := builder.String()
@@ -5635,6 +5635,12 @@ func TestOverrideApex(t *testing.T) {
 	ensureNotContains(t, androidMk, "LOCAL_MODULE := override_app.myapex")
 	ensureNotContains(t, androidMk, "LOCAL_MODULE := apex_manifest.pb.myapex")
 	ensureNotContains(t, androidMk, "LOCAL_MODULE_STEM := myapex.apex")
+
+	flattenedBundle := ctx.ModuleForTests("myapex", "android_common_override_myapex_myapex_flattened").Module().(*apexBundle)
+	flattenedData := android.AndroidMkDataForTest(t, ctx, flattenedBundle)
+	var flattenedBuilder strings.Builder
+	flattenedData.Custom(&flattenedBuilder, flattenedBundle.Name(), "TARGET_", "", flattenedData)
+	ensureContains(t, flattenedBuilder.String(), "PACKAGES.override_myapex.flattened.OVERRIDES := unknownapex myapex")
 }
 
 func TestLegacyAndroid10Support(t *testing.T) {
