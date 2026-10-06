@@ -14,6 +14,7 @@ bootstrap_go_package {
         "clang.go",
         "global.go",
         "tidy.go",
+        "tidy_clang22_checks.go",
         "toolchain.go",
         "vndk.go",
 
@@ -32,7 +33,9 @@ bootstrap_go_package {
         "arm64_linux_host.go",
     ],
     testSrcs: [
+        "arm_device_test.go",
         "bp2build_test.go",
+        "clang_version_test.go",
         "tidy_test.go",
     ],
 }

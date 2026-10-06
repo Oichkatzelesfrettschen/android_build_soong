@@ -98,109 +98,21 @@ var ClangTidyDisableChecks = []string{
 }
 
 func init() {
-	staticVariableExportedToBazel("ClangExtraCflags", []string{
-		"-D__compiler_offsetof=__builtin_offsetof",
-
-		// Emit address-significance table which allows linker to perform safe ICF. Clang does
-		// not emit the table by default on Android since NDK still uses GNU binutils.
-		"-faddrsig",
-
-		// Turn on -fcommon explicitly, since Clang now defaults to -fno-common. The cleanup bug
-		// tracking this is http://b/151457797.
-		"-fcommon",
-
-		// Help catch common 32/64-bit errors.
-		"-Werror=int-conversion",
-
-		// Enable the new pass manager.
-		"-fexperimental-new-pass-manager",
-
-		// Disable overly aggressive warning for macros defined with a leading underscore
-		// This happens in AndroidConfig.h, which is included nearly everywhere.
-		// TODO: can we remove this now?
-		"-Wno-reserved-id-macro",
-
-		// Workaround for ccache with clang.
-		// See http://petereisentraut.blogspot.com/2011/05/ccache-and-clang.html.
-		"-Wno-unused-command-line-argument",
-
-		// Force clang to always output color diagnostics. Ninja will strip the ANSI
-		// color codes if it is not running in a terminal.
-		"-fcolor-diagnostics",
-
-		// Warnings from clang-7.0
-		"-Wno-sign-compare",
-
-		// Warnings from clang-8.0
-		"-Wno-defaulted-function-deleted",
-
-		// Disable -Winconsistent-missing-override until we can clean up the existing
-		// codebase for it.
-		"-Wno-inconsistent-missing-override",
-
-		// Warnings from clang-10
-		// Nested and array designated initialization is nice to have.
-		"-Wno-c99-designator",
-
-		// Warnings from clang-12
-		"-Wno-gnu-folding-constant",
-
-		// Calls to the APIs that are newer than the min sdk version of the caller should be
-		// guarded with __builtin_available.
-		"-Wunguarded-availability",
-		// This macro allows the bionic versioning.h to indirectly determine whether the
-		// option -Wunguarded-availability is on or not.
-		"-D__ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__",
+	exportedVars.Set("ClangExtraCflags", variableValue(clangExtraCflagsForMajor(clangDefaultMajorVersion())))
+	pctx.VariableFunc("ClangExtraCflags", func(ctx android.PackageVarContext) string {
+		return strings.Join(clangExtraCflags(ctx.Config()), " ")
 	})
 
-	staticVariableExportedToBazel("ClangExtraCppflags", []string{
-		// -Wimplicit-fallthrough is not enabled by -Wall.
-		"-Wimplicit-fallthrough",
-
-		// Enable clang's thread-safety annotations in libcxx.
-		"-D_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS",
-
-		// libc++'s math.h has an #include_next outside of system_headers.
-		"-Wno-gnu-include-next",
+	exportedVars.Set("ClangExtraCppflags", variableValue(clangExtraCppflagsForMajor(clangDefaultMajorVersion())))
+	pctx.VariableFunc("ClangExtraCppflags", func(ctx android.PackageVarContext) string {
+		return strings.Join(clangExtraCppflags(ctx.Config()), " ")
 	})
 
 	staticVariableExportedToBazel("ClangExtraTargetCflags", []string{"-nostdlibinc"})
 
-	staticVariableExportedToBazel("ClangExtraNoOverrideCflags", []string{
-		"-Werror=address-of-temporary",
-		// Bug: http://b/29823425 Disable -Wnull-dereference until the
-		// new cases detected by this warning in Clang r271374 are
-		// fixed.
-		//"-Werror=null-dereference",
-		"-Werror=return-type",
-
-		// http://b/72331526 Disable -Wtautological-* until the instances detected by these
-		// new warnings are fixed.
-		"-Wno-tautological-constant-compare",
-		"-Wno-tautological-type-limit-compare",
-		// http://b/145210666
-		"-Wno-reorder-init-list",
-		// http://b/145211066
-		"-Wno-implicit-int-float-conversion",
-		// New warnings to be fixed after clang-r377782.
-		"-Wno-int-in-bool-context",          // http://b/148287349
-		"-Wno-sizeof-array-div",             // http://b/148815709
-		"-Wno-tautological-overlap-compare", // http://b/148815696
-		// New warnings to be fixed after clang-r383902.
-		"-Wno-deprecated-copy",                      // http://b/153746672
-		"-Wno-range-loop-construct",                 // http://b/153747076
-		"-Wno-misleading-indentation",               // http://b/153746954
-		"-Wno-zero-as-null-pointer-constant",        // http://b/68236239
-		"-Wno-deprecated-anon-enum-enum-conversion", // http://b/153746485
-		"-Wno-deprecated-enum-enum-conversion",      // http://b/153746563
-		"-Wno-string-compare",                       // http://b/153764102
-		"-Wno-enum-enum-conversion",                 // http://b/154138986
-		"-Wno-enum-float-conversion",                // http://b/154255917
-		"-Wno-pessimizing-move",                     // http://b/154270751
-		// New warnings to be fixed after clang-r399163
-		"-Wno-non-c-typedef-for-linkage", // http://b/161304145
-		// New warnings to be fixed after clang-r407598
-		"-Wno-string-concatenation", // http://b/175068488
+	exportedVars.Set("ClangExtraNoOverrideCflags", variableValue(clangExtraNoOverrideCflagsForMajor(clangDefaultMajorVersion())))
+	pctx.VariableFunc("ClangExtraNoOverrideCflags", func(ctx android.PackageVarContext) string {
+		return strings.Join(clangExtraNoOverrideCflags(ctx.Config()), " ")
 	})
 
 	// Extra cflags for external third-party projects to disable warnings that
@@ -227,6 +139,227 @@ func init() {
 		// http://b/165945989
 		"-Wno-psabi",
 	})
+}
+
+var clangExtraCflagsBase = []string{
+	"-D__compiler_offsetof=__builtin_offsetof",
+
+	// Emit address-significance table which allows linker to perform safe ICF. Clang does
+	// not emit the table by default on Android since NDK still uses GNU binutils.
+	"-faddrsig",
+
+	// Turn on -fcommon explicitly, since Clang now defaults to -fno-common. The cleanup bug
+	// tracking this is http://b/151457797.
+	"-fcommon",
+
+	// Help catch common 32/64-bit errors.
+	"-Werror=int-conversion",
+
+	// Enable the new pass manager.
+	"-fexperimental-new-pass-manager",
+
+	// Disable overly aggressive warning for macros defined with a leading underscore
+	// This happens in AndroidConfig.h, which is included nearly everywhere.
+	// TODO: can we remove this now?
+	"-Wno-reserved-id-macro",
+
+	// Workaround for ccache with clang.
+	// See http://petereisentraut.blogspot.com/2011/05/ccache-and-clang.html.
+	"-Wno-unused-command-line-argument",
+
+	// Force clang to always output color diagnostics. Ninja will strip the ANSI
+	// color codes if it is not running in a terminal.
+	"-fcolor-diagnostics",
+
+	// Warnings from clang-7.0
+	"-Wno-sign-compare",
+
+	// Warnings from clang-8.0
+	"-Wno-defaulted-function-deleted",
+
+	// Disable -Winconsistent-missing-override until we can clean up the existing
+	// codebase for it.
+	"-Wno-inconsistent-missing-override",
+
+	// Warnings from clang-10
+	// Nested and array designated initialization is nice to have.
+	"-Wno-c99-designator",
+
+	// Warnings from clang-12
+	"-Wno-gnu-folding-constant",
+
+	// Calls to the APIs that are newer than the min sdk version of the caller should be
+	// guarded with __builtin_available.
+	"-Wunguarded-availability",
+	// This macro allows the bionic versioning.h to indirectly determine whether the
+	// option -Wunguarded-availability is on or not.
+	"-D__ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__",
+}
+
+var clangExtraCppflagsBase = []string{
+	// -Wimplicit-fallthrough is not enabled by -Wall.
+	"-Wimplicit-fallthrough",
+
+	// Enable clang's thread-safety annotations in libcxx.
+	"-D_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS",
+
+	// libc++'s math.h has an #include_next outside of system_headers.
+	"-Wno-gnu-include-next",
+}
+
+var clangExtraNoOverrideCflagsBase = []string{
+	"-Werror=address-of-temporary",
+	// Bug: http://b/29823425 Disable -Wnull-dereference until the
+	// new cases detected by this warning in Clang r271374 are
+	// fixed.
+	//"-Werror=null-dereference",
+	"-Werror=return-type",
+
+	// http://b/72331526 Disable -Wtautological-* until the instances detected by these
+	// new warnings are fixed.
+	"-Wno-tautological-constant-compare",
+	"-Wno-tautological-type-limit-compare",
+	// http://b/145210666
+	"-Wno-reorder-init-list",
+	// http://b/145211066
+	"-Wno-implicit-int-float-conversion",
+	// New warnings to be fixed after clang-r377782.
+	"-Wno-int-in-bool-context",          // http://b/148287349
+	"-Wno-sizeof-array-div",             // http://b/148815709
+	"-Wno-tautological-overlap-compare", // http://b/148815696
+	// New warnings to be fixed after clang-r383902.
+	"-Wno-deprecated-copy",                      // http://b/153746672
+	"-Wno-range-loop-construct",                 // http://b/153747076
+	"-Wno-misleading-indentation",               // http://b/153746954
+	"-Wno-zero-as-null-pointer-constant",        // http://b/68236239
+	"-Wno-deprecated-anon-enum-enum-conversion", // http://b/153746485
+	"-Wno-deprecated-enum-enum-conversion",      // http://b/153746563
+	"-Wno-string-compare",                       // http://b/153764102
+	"-Wno-enum-enum-conversion",                 // http://b/154138986
+	"-Wno-enum-float-conversion",                // http://b/154255917
+	"-Wno-pessimizing-move",                     // http://b/154270751
+	// New warnings to be fixed after clang-r399163
+	"-Wno-non-c-typedef-for-linkage", // http://b/161304145
+	// New warnings to be fixed after clang-r407598
+	"-Wno-string-concatenation", // http://b/175068488
+}
+
+// clangExtraCflags returns ClangExtraCflags for the Clang release of config.
+func clangExtraCflags(config android.Config) []string {
+	return clangExtraCflagsForMajor(ClangMajorVersion(config))
+}
+
+func clangExtraCflagsForMajor(major int) []string {
+	return clangFilterPassManagerCflagsForMajor(major, clangExtraCflagsBase)
+}
+
+// clangExtraCppflags returns ClangExtraCppflags for the Clang release of
+// config. Clang 19 enables -fsized-deallocation by default and then emits
+// calls to operator delete(void*, size_t); modules that define only the unsized
+// operators and link no C++ runtime leave that symbol undefined.
+func clangExtraCppflags(config android.Config) []string {
+	return clangExtraCppflagsForMajor(ClangMajorVersion(config))
+}
+
+func clangExtraCppflagsForMajor(major int) []string {
+	flags := append([]string{}, clangExtraCppflagsBase...)
+	if major >= 19 {
+		flags = append(flags, "-fno-sized-deallocation")
+	}
+	return flags
+}
+
+// clangExtraNoOverrideCflags returns ClangExtraNoOverrideCflags for the Clang
+// release of config.
+func clangExtraNoOverrideCflags(config android.Config) []string {
+	return clangExtraNoOverrideCflagsForMajor(ClangMajorVersion(config))
+}
+
+func clangExtraNoOverrideCflagsForMajor(major int) []string {
+	flags := append([]string{}, clangExtraNoOverrideCflagsBase...)
+	if major >= 22 {
+		flags = append(flags, clang22NoOverrideCflags...)
+	}
+	return flags
+}
+
+// clang22NoOverrideCflags silence diagnostics that Clang 22 reports, by
+// default or under -Wall and -Wextra, on sources the tree compiles cleanly
+// with earlier releases. compilerFlags adds -Wall -Werror to modules outside
+// WarningAllowedProjects, so each diagnostic fails the compile. The
+// no-override position after module cflags keeps a module's -Werror=<name>
+// from enabling them again.
+var clang22NoOverrideCflags = []string{
+	"-Wno-unnecessary-virtual-specifier",
+	"-Wno-deprecated-non-prototype",
+	"-Wno-nontrivial-memcall",
+	"-Wno-deprecated-builtins",
+	"-Wno-unterminated-string-initialization",
+	"-Wno-deprecated-literal-operator",
+	"-Wno-missing-designated-field-initializers",
+	"-Wno-bitwise-instead-of-logical",
+	"-Wno-unused-but-set-variable",
+	"-Wno-vla-cxx-extension",
+	"-Wno-array-parameter",
+	"-Wno-single-bit-bitfield-constant-conversion",
+	"-Wno-packed-non-pod",
+	"-Wno-deprecated-redundant-constexpr-static-def",
+	"-Wno-null-pointer-subtraction",
+	"-Wno-cast-function-type-mismatch",
+	"-Wno-unqualified-std-cast-call",
+	"-Wno-invalid-offsetof",
+	"-Wno-thread-safety-reference-return",
+	"-Wno-unused-but-set-parameter",
+	"-Wno-character-conversion",
+	"-Wno-missing-template-arg-list-after-template-kw",
+	"-Wno-deprecated-this-capture",
+	"-Wno-strict-prototypes",
+	"-Wno-void-pointer-to-enum-cast",
+	"-Wno-ordered-compare-function-pointers",
+	"-Wno-align-mismatch",
+	"-Wno-enum-compare",
+	"-Wno-implicit-enum-enum-cast",
+	"-Wno-uninitialized-const-pointer",
+	"-Wno-main",
+	"-Wno-pointer-bool-conversion",
+	"-Wno-logical-op-parentheses",
+	"-Wno-tautological-compare",
+}
+
+// ClangHasLegacyPassManager reports whether the compiler still carries the
+// legacy pass manager. Clang 15 removes it, so the new pass manager is the
+// only pipeline.
+func ClangHasLegacyPassManager(config android.Config) bool {
+	return ClangMajorVersion(config) < 15
+}
+
+// ClangFilterPassManagerCflags rewrites the pass manager selectors for the
+// Clang release from ClangMajorVersion. Through Clang 13 the driver takes
+// -fexperimental-new-pass-manager and -fno-experimental-new-pass-manager.
+// Clang 14 removes both spellings, defaults to the new pass manager and
+// selects the legacy one with -flegacy-pass-manager. From Clang 15 no legacy
+// pass manager exists and both selectors are dropped.
+func ClangFilterPassManagerCflags(config android.Config, cflags []string) []string {
+	return clangFilterPassManagerCflagsForMajor(ClangMajorVersion(config), cflags)
+}
+
+func clangFilterPassManagerCflagsForMajor(major int, cflags []string) []string {
+	if major < 14 {
+		return cflags
+	}
+	ret := make([]string, 0, len(cflags))
+	for _, f := range cflags {
+		switch f {
+		case "-fexperimental-new-pass-manager":
+		case "-fno-experimental-new-pass-manager":
+			if major == 14 {
+				ret = append(ret, "-flegacy-pass-manager")
+			}
+		default:
+			ret = append(ret, f)
+		}
+	}
+	return ret
 }
 
 func ClangFilterUnknownCflags(cflags []string) []string {
