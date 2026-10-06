@@ -122,10 +122,10 @@ func makeVarsProvider(ctx android.MakeVarsContext) {
 	ctx.Strict("SOONG_MODULES_USING_WNO_ERROR", makeStringOfKeys(ctx, modulesUsingWnoErrorKey))
 	ctx.Strict("SOONG_MODULES_MISSING_PGO_PROFILE_FILE", makeStringOfKeys(ctx, modulesMissingProfileFileKey))
 
-	ctx.Strict("ADDRESS_SANITIZER_CONFIG_EXTRA_CFLAGS", strings.Join(asanCflags, " "))
+	ctx.Strict("ADDRESS_SANITIZER_CONFIG_EXTRA_CFLAGS", strings.Join(config.ClangFilterPassManagerCflags(ctx.Config(), asanCflags), " "))
 	ctx.Strict("ADDRESS_SANITIZER_CONFIG_EXTRA_LDFLAGS", strings.Join(asanLdflags, " "))
 
-	ctx.Strict("HWADDRESS_SANITIZER_CONFIG_EXTRA_CFLAGS", strings.Join(hwasanCflags, " "))
+	ctx.Strict("HWADDRESS_SANITIZER_CONFIG_EXTRA_CFLAGS", strings.Join(config.ClangFilterPassManagerCflags(ctx.Config(), hwasanCflags), " "))
 	ctx.Strict("HWADDRESS_SANITIZER_GLOBAL_OPTIONS", strings.Join(hwasanGlobalOptions, ","))
 
 	ctx.Strict("CFI_EXTRA_CFLAGS", strings.Join(cfiCflags, " "))
@@ -237,11 +237,15 @@ func makeVarsToolchain(ctx android.MakeVarsContext, secondPrefix string,
 		clangExtras,
 		productExtraCflags,
 	}, " "))
-	ctx.Strict(clangPrefix+"GLOBAL_CPPFLAGS", strings.Join([]string{
+	globalCppflags := []string{
 		"${config.CommonClangGlobalCppflags}",
 		fmt.Sprintf("${config.%sGlobalCppflags}", hod),
 		toolchain.ClangCppflags(),
-	}, " "))
+	}
+	if target.Os == android.Linux {
+		globalCppflags = append(globalCppflags, config.LinuxGlibcClangCppflags(ctx.Config())...)
+	}
+	ctx.Strict(clangPrefix+"GLOBAL_CPPFLAGS", strings.Join(globalCppflags, " "))
 	ctx.Strict(clangPrefix+"GLOBAL_LDFLAGS", strings.Join([]string{
 		fmt.Sprintf("${config.%sGlobalLdflags}", hod),
 		toolchain.ClangLdflags(),
